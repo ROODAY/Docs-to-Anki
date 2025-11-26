@@ -1,0 +1,10 @@
+.env
+checkpoint.json
+__pycache__/
+*.pyc
+*.apkg
+*.tsv
+*.md
+.venv/
+
+!README.md

@@ -1,6 +1,6 @@
 # Docs-to-Anki
 
-Convert exported Google Docs (markdown) lessons into Anki importable cards using OpenAI (gpt5-mini).
+Convert exported Google Docs (markdown) lessons into Anki importable cards using OpenAI (gpt-5-mini).
 
 Quick overview
 

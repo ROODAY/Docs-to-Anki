@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from src.processor import find_sections
-from src.openai_client import call_openai_for_section, make_prompt_for_section, FALLBACK_MODELS
+from src.openai_client import call_openai_for_section, make_prompt_for_section
 import openai
 import os
 
@@ -39,8 +39,8 @@ def main():
         print('\n--- Raw response follow-up attempt ---')
         # Attempt a raw call to inspect the exact response content
         messages = make_prompt_for_section(first.get('content',''), date_str)
-        configured = os.getenv('OPENAI_MODEL', 'gpt5-mini')
-        models_to_try = [configured] + FALLBACK_MODELS
+        configured = os.getenv('OPENAI_MODEL', 'gpt-5-mini')
+        models_to_try = [configured]
         succeeded = False
         for m in models_to_try:
             print(f"Trying model: {m}")

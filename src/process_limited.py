@@ -10,10 +10,11 @@ import argparse
 import os
 import csv
 from src.processor import find_sections, Checkpoint
+import asyncio
 from src.openai_client import call_openai_for_section
 
 
-def process_limited(input_path: str, out_tsv: str, checkpoint_file: str, limit: int = 5):
+async def process_limited(input_path: str, out_tsv: str, checkpoint_file: str, limit: int = 5):
     with open(input_path, "r", encoding="utf-8") as f:
         md = f.read()
     sections = find_sections(md)
@@ -28,7 +29,7 @@ def process_limited(input_path: str, out_tsv: str, checkpoint_file: str, limit: 
         if cp.is_processed(date_str):
             continue
         try:
-            cards = call_openai_for_section(s.get("content", ""), date_str)
+            cards = await call_openai_for_section(s.get("content", ""), date_str)
             for c in cards:
                 if "tags" not in c:
                     c["tags"] = f"tamil,{date_str}"
@@ -60,4 +61,4 @@ if __name__ == '__main__':
     p.add_argument("--checkpoint", default=os.getenv("CHECKPOINT_FILE", "checkpoint.json"))
     p.add_argument("--limit", type=int, default=5)
     args = p.parse_args()
-    process_limited(args.input, args.out, args.checkpoint, limit=args.limit)
+    asyncio.run(process_limited(args.input, args.out, args.checkpoint, limit=args.limit))

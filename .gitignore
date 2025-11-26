@@ -6,5 +6,6 @@ __pycache__/
 *.tsv
 *.md
 .venv/
+outputs/
 
 !README.md

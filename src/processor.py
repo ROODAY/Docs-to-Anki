@@ -70,10 +70,14 @@ class Checkpoint:
             with open(path, "r", encoding="utf-8") as f:
                 self.data = json.load(f)
         except Exception:
-            self.data = {"last_date": None, "processed": []}
+            # Rely solely on a processed list. Do not maintain a separate
+            # last_date value because processing can succeed out-of-order.
+            self.data = {"processed": []}
 
     def last_date(self) -> Optional[str]:
-        return self.data.get("last_date")
+        # Deprecated: last_date is no longer authoritative; return None
+        # to discourage other code from relying on it.
+        return None
 
     def is_processed(self, date_str: str) -> bool:
         return date_str in self.data.get("processed", [])
@@ -83,16 +87,10 @@ class Checkpoint:
             self.data["processed"] = []
         if date_str not in self.data["processed"]:
             self.data["processed"].append(date_str)
-            # update last_date to the newest by parsing
-            try:
-                dates = [d for d in self.data["processed"] if d]
-                parsed = [_parse_date(d) for d in dates]
-                parsed = [p for p in parsed if p]
-                if parsed:
-                    latest = max(parsed)
-                    self.data["last_date"] = latest.strftime("%m/%d/%Y")
-            except Exception:
-                pass
+            # Save processed list immediately so successful sections are
+            # persisted even if later sections fail. We intentionally do not
+            # compute or store a `last_date` value to avoid missing out-of-
+            # order successes on subsequent runs.
             self._save()
 
     def _save(self):

@@ -38,6 +38,18 @@ python -m src.main --input lessons.md --out cards.tsv
 
 This will create `cards.tsv` and update `checkpoint.json`.
 
+Limit and interruptible processing
+
+- `src.main` now supports an optional `--limit N` flag. If provided, the program will process at most N new lessons (skipping already-processed lessons tracked in `checkpoint.json`). If omitted, the tool processes all remaining lessons.
+
+```pwsh
+python -m src.main --input lessons.md --out cards.tsv --checkpoint checkpoint.json --limit 5
+```
+
+- The code uses the async OpenAI client and `asyncio` timeouts, so you can interrupt a running job immediately with Ctrl+C. When an API response cannot be parsed or is empty, the raw OpenAI response is logged for debugging.
+
+- Note: `process_limited.py` has been removed; use `python -m src.main --limit N` for the same behavior.
+
 Notes
 
 - The tool tries to be token-efficient: it asks the model to return a compact JSON array of cards only.

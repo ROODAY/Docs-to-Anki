@@ -4,3 +4,4 @@ tqdm>=4.0.0
 requests>=2.0.0
 genanki>=0.13.0
 tenacity>=8.0.0
+ tiktoken>=0.4.0

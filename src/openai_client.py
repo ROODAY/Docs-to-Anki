@@ -5,7 +5,13 @@ from typing import List, Dict, Any
 from openai import AsyncOpenAI, APIError, RateLimitError, InternalServerError
 from dotenv import load_dotenv
 import logging
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, before_sleep_log
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+    before_sleep_log,
+)
 import tiktoken
 from datetime import datetime
 
@@ -29,14 +35,28 @@ client = AsyncOpenAI(api_key=OPENAI_API_KEY)
 def make_prompt_for_section(section_text: str, lesson_date: str):
     """Constructs messages for the OpenAI chat.completions API."""
     system = (
-        "You convert Tamil lesson notes into strict JSON flashcards."
-        "ONLY output JSON. No extra text."
-        "Format: an array of objects with keys: 'front', 'back', optional 'tags'."
+        "You convert Tamil lesson notes into strict JSON flashcards for language learning. "
+        "ONLY output JSON. No extra text. "
+        "Format: an array of objects with keys: 'front', 'back', optional 'tags'. "
+        "\n\n"
+        "CRITICAL REQUIREMENTS:\n"
+        "1. Language separation: Each card must have one side ONLY in Tamil and the other side ONLY in English. "
+        "   This enables reverse card format. Do not mix languages on the same side.\n"
+        "2. Use standard ASCII punctuation: Use only standard ASCII characters for punctuation. "
+        "   Avoid Unicode quote characters (curly quotes like ' ' \" \") and other fancy Unicode characters "
+        "   that may display as HTML entity codes in Anki. Standard ASCII quotes (\"), apostrophes ('), "
+        "   and other ASCII punctuation are fine and will display normally.\n"
+        "3. One example per card: If there are multiple examples or phrases, create separate cards for each one. "
+        "   Do not combine multiple examples into a single card.\n"
+        "4. Filter content: Only create cards from content that makes sense as language learning material. "
+        "   Skip meta-text like 'next lesson we will learn', 'in this chapter', 'remember that', "
+        "   or other instructional text that is not actual language content (vocabulary, phrases, sentences)."
     )
     user = (
         f"Lesson date: {lesson_date}\n\n"
         f"{section_text}\n\n"
-        "Output only JSON. Do not wrap in markdown. Do not add explanations."
+        "Create flashcards following all requirements. Output only valid JSON array. "
+        "Do not wrap in markdown. Do not add explanations."
     )
     return [
         {"role": "system", "content": system},
@@ -44,7 +64,9 @@ def make_prompt_for_section(section_text: str, lesson_date: str):
     ]
 
 
-async def _call_openai_async(messages, model_name: str, max_completion_tokens: int = 4000):
+async def _call_openai_async(
+    messages, model_name: str, max_completion_tokens: int = 4000
+):
     """Makes the actual OpenAI request with timeout handling."""
     try:
         resp = await asyncio.wait_for(
@@ -68,20 +90,33 @@ async def _call_openai_async(messages, model_name: str, max_completion_tokens: i
         raise
 
 
-async def call_openai_for_section(section_text: str, lesson_date: str, max_retries: int = 3, max_completion_tokens: int = 4000) -> List[Dict[str, Any]]:
+async def call_openai_for_section(
+    section_text: str,
+    lesson_date: str,
+    max_retries: int = 3,
+    max_completion_tokens: int = 4000,
+) -> List[Dict[str, Any]]:
     messages = make_prompt_for_section(section_text, lesson_date)
     model = OPENAI_MODEL
 
     # compute request token count once (before firing the request)
     try:
         encoding = tiktoken.encoding_for_model(model)
-        joined = "\n".join([f"{m.get('role','')}: {m.get('content','')}" for m in messages])
+        joined = "\n".join(
+            [f"{m.get('role', '')}: {m.get('content', '')}" for m in messages]
+        )
         request_token_count = len(encoding.encode(joined))
     except Exception:
         request_token_count = None
 
-    logger.info("Calling OpenAI model=%s for lesson=%s (max_retries=%d, timeout=%ss, max_completion_tokens=%d)",
-                model, lesson_date, max_retries, OPENAI_REQUEST_TIMEOUT, max_completion_tokens)
+    logger.info(
+        "Calling OpenAI model=%s for lesson=%s (max_retries=%d, timeout=%ss, max_completion_tokens=%d)",
+        model,
+        lesson_date,
+        max_retries,
+        OPENAI_REQUEST_TIMEOUT,
+        max_completion_tokens,
+    )
     if request_token_count is not None:
         logger.info("Request token count=%d for model=%s", request_token_count, model)
     else:
@@ -89,15 +124,21 @@ async def call_openai_for_section(section_text: str, lesson_date: str, max_retri
 
     attempts = {"count": 0}
 
-    @retry(stop=stop_after_attempt(max_retries),
-           wait=wait_exponential(multiplier=1, min=1, max=30),
-           retry=retry_if_exception_type((asyncio.TimeoutError, APIError, RateLimitError, InternalServerError)),
-           reraise=True,
-           before_sleep=before_sleep_log(logger, logging.WARNING))
+    @retry(
+        stop=stop_after_attempt(max_retries),
+        wait=wait_exponential(multiplier=1, min=1, max=30),
+        retry=retry_if_exception_type(
+            (asyncio.TimeoutError, APIError, RateLimitError, InternalServerError)
+        ),
+        reraise=True,
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+    )
     async def _attempt_call():
         attempts["count"] += 1
         logger.info("Attempt %d/%d", attempts["count"], max_retries)
-        return await _call_openai_async(messages, model, max_completion_tokens=max_completion_tokens)
+        return await _call_openai_async(
+            messages, model, max_completion_tokens=max_completion_tokens
+        )
 
     try:
         resp = await _attempt_call()
@@ -141,11 +182,17 @@ async def call_openai_for_section(section_text: str, lesson_date: str, max_retri
             ts = datetime.utcnow().isoformat()
             try:
                 with open(fail_path, "a", encoding="utf-8") as ff:
-                    ff.write(f"{ts} | {lesson_date} | tokens={token_count or 'unknown'} | finish_reason=length\n")
+                    ff.write(
+                        f"{ts} | {lesson_date} | tokens={token_count or 'unknown'} | finish_reason=length\n"
+                    )
             except Exception:
                 logger.warning("Failed to write failure log to %s", fail_path)
 
-            logger.error("Model response truncated (finish_reason=length) for lesson=%s; logged to %s", lesson_date, fail_path)
+            logger.error(
+                "Model response truncated (finish_reason=length) for lesson=%s; logged to %s",
+                lesson_date,
+                fail_path,
+            )
             raise RuntimeError("Model response truncated (finish_reason=length)")
     except Exception:
         # If anything goes wrong during finish_reason inspection, continue
@@ -169,10 +216,14 @@ async def call_openai_for_section(section_text: str, lesson_date: str, max_retri
             ts = datetime.utcnow().isoformat()
             token_count = request_token_count
             with open(fail_path, "a", encoding="utf-8") as ff:
-                ff.write(f"{ts} | {lesson_date} | tokens={token_count or 'unknown'} | reason=extraction_failed\n")
+                ff.write(
+                    f"{ts} | {lesson_date} | tokens={token_count or 'unknown'} | reason=extraction_failed\n"
+                )
             # also write full raw response to a separate file for inspection
             safe_date = (lesson_date or "unknown").replace("/", "-")
-            raw_path = os.path.join(OUTPUT_DIR, f"failure-{safe_date}-{ts.replace(':','-')}.json")
+            raw_path = os.path.join(
+                OUTPUT_DIR, f"failure-{safe_date}-{ts.replace(':', '-')}.json"
+            )
             try:
                 with open(raw_path, "w", encoding="utf-8") as rf:
                     json.dump(raw, rf, ensure_ascii=False, indent=2)
@@ -184,7 +235,7 @@ async def call_openai_for_section(section_text: str, lesson_date: str, max_retri
         raise RuntimeError("Unable to extract content from OpenAI response")
 
     # clean content
-    content = str(content).lstrip('\ufeff').strip()
+    content = str(content).lstrip("\ufeff").strip()
     if content.startswith("```"):
         lines = content.splitlines()
         lines = lines[1:] if len(lines) > 1 else []
@@ -206,7 +257,7 @@ async def call_openai_for_section(section_text: str, lesson_date: str, max_retri
         s = content.find("[")
         e = content.rfind("]")
         if s != -1 and e != -1 and e > s:
-            parsed = json.loads(content[s:e+1])
+            parsed = json.loads(content[s : e + 1])
             if isinstance(parsed, list):
                 logger.info("Parsed JSON from substring with %d items", len(parsed))
                 return parsed

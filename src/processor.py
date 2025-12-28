@@ -26,11 +26,13 @@ def find_sections(markdown_text: str) -> List[dict]:
         nonlocal current_date, current_lines
         if current_date or current_lines:
             content = "\n".join(current_lines).strip()
-            sections.append({
-                "date_str": current_date,
-                "date": _parse_date(current_date) if current_date else None,
-                "content": content,
-            })
+            sections.append(
+                {
+                    "date_str": current_date,
+                    "date": _parse_date(current_date) if current_date else None,
+                    "content": content,
+                }
+            )
             current_lines = []
             current_date = None
 
@@ -62,6 +64,7 @@ def _parse_date(date_str: Optional[str]) -> Optional[datetime]:
 
 
 # Checkpointing
+
 
 class Checkpoint:
     def __init__(self, path: str = "checkpoint.json"):

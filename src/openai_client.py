@@ -50,7 +50,9 @@ def make_prompt_for_section(section_text: str, lesson_date: str):
         "   Do not combine multiple examples into a single card.\n"
         "4. Filter content: Only create cards from content that makes sense as language learning material. "
         "   Skip meta-text like 'next lesson we will learn', 'in this chapter', 'remember that', "
-        "   or other instructional text that is not actual language content (vocabulary, phrases, sentences)."
+        "   or other instructional text that is not actual language content (vocabulary, phrases, sentences).\n"
+        "5. Correct typos: If you encounter minor typos in either Tamil or English text from the source material, "
+        "   correct them in the flashcards. Ensure the final cards have accurate spelling and grammar."
     )
     user = (
         f"Lesson date: {lesson_date}\n\n"
